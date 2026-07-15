@@ -27,21 +27,15 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCall
   cb(null, true);
 };
 
-// Single optional "image" field — used by both comment create and update.
 export const uploadImage = multer({
   storage,
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("image");
 
-// Comment.imageUrl is stored as the public "/uploads/<file>" path returned to
-// clients, so this reverses that back to a real disk path for cleanup.
 export const deleteUploadedFile = (imageUrl: string) => {
   const filename = path.basename(imageUrl);
   const filePath = path.join(UPLOADS_DIR, filename);
 
-  fs.unlink(filePath, () => {
-    // Best-effort cleanup — a missing file (already gone, or an external URL
-    // that was never ours) isn't worth surfacing as an error.
-  });
+  fs.unlink(filePath, () => {});
 };

@@ -2,8 +2,6 @@ import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import { objectIdSchema } from "./common.js";
 
-// Nothing in this app renders rich text, so the simplest XSS-proof approach is
-// to strip all markup server-side rather than trying to allow-list a "safe" subset.
 const stripMarkup = (value: string) => sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} });
 
 const contentSchema = z
@@ -14,17 +12,20 @@ const contentSchema = z
   .transform(stripMarkup)
   .pipe(z.string().min(1, "Content is required"));
 
+const visibilitySchema = z.enum(["public", "private"]);
+
 export const createPostSchema = z.object({
   body: z.object({
     content: contentSchema,
+    visibility: visibilitySchema.default("public"),
   }),
 });
 
 export const updatePostSchema = z.object({
   body: z.object({
     content: contentSchema,
-    // multipart fields arrive as strings, hence the coercion
     removeImage: z.coerce.boolean().optional(),
+    visibility: visibilitySchema.optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });

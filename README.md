@@ -28,14 +28,15 @@ npm run dev
 | `npm start`                 | Run the compiled server (`dist/server.js`)             |
 | `npm run typecheck`         | Type-check without emitting output                    |
 | `npm run migrate:comments`  | One-off migration for the legacy embedded-array comment shape |
-| `npm run verify:indexes`    | Print the indexes on `users`/`comments`/`reactions`    |
+| `npm run sync:indexes`      | Rebuild indexes to match the current schemas (run after any indexed-field change) |
+| `npm run verify:indexes`    | Print the indexes on `users`/`posts`/`comments`/`reactions` |
 
 ## Architecture
 
-- `src/models` — Mongoose schemas. `Post` is the root content type; comments and replies share one flat `Comment` collection (`postId` links a comment to its post, `parentId` links a reply to its parent). Likes/dislikes on both posts and comments live in a single polymorphic `Reaction` collection (`targetType` + `targetId`) with a unique `(targetType, targetId, userId)` index. Like/dislike/comment counts are denormalized onto the post/comment documents and updated atomically, so lists never have to compute counts at read time.
-- `src/services` — business logic; feed and comment/reply listing use cursor (keyset) pagination rather than offset pagination, so they stay fast regardless of collection size.
+- `src/models` — Mongoose schemas. `Post` is the root content type, with a `visibility` of `public` (default) or `private` (visible only to its author). Comments and replies share one flat `Comment` collection (`postId` links a comment to its post, `parentId` links a reply to its parent) — a comment thread inherits its post's visibility, so a private post's comments are 404 to everyone but the author, even by guessing a comment id directly. Likes/dislikes on both posts and comments live in a single polymorphic `Reaction` collection (`targetType` + `targetId`) with a unique `(targetType, targetId, userId)` index. Like/dislike/comment counts are denormalized onto the post/comment documents and updated atomically, so lists never have to compute counts at read time.
+- `src/services` — business logic; feed and comment/reply listing use cursor (keyset) pagination rather than offset pagination, so they stay fast regardless of collection size. GET routes use `optionalAuth` (decodes a JWT if present, but doesn't require one) so anonymous browsing still works while an authenticated viewer gets their own like/dislike state (`userReaction`) attached to each post/comment, and can see their own private posts. `GET /posts/:id/likes` and `GET /comments/:id/likes` list who reacted.
 - `src/controllers`, `src/routes` — thin HTTP layer; validation happens via `src/validators` (Zod) before a request reaches a controller.
-- `src/middleware` — auth (JWT), centralized error handling, request validation, rate limiting.
+- `src/middleware` — auth (JWT, required or optional), centralized error handling, request validation, rate limiting.
 - `src/sockets` — Socket.IO setup. Clients only ever send `join-post`/`leave-post` (room = post id); all post/comment/reaction events are emitted server-side after a mutation is persisted via the authenticated REST API, so a client can't forge a fake real-time event.
 
 ## Real-time (Socket.IO) and serverless hosting

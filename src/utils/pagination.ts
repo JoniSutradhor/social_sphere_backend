@@ -22,7 +22,6 @@ export const decodeCursor = <T>(cursor: string): T => {
   }
 };
 
-/** Keyset seek filter for a single `createdAt` + `_id` tiebreaker sort. */
 export const dateIdSeekFilter = (
   cursor: DateIdCursor,
   direction: "asc" | "desc" = "desc"
@@ -37,7 +36,6 @@ export const dateIdSeekFilter = (
   };
 };
 
-/** Keyset seek filter for a `countField` (desc) + `createdAt` (desc) + `_id` tiebreaker sort. */
 export const countDateIdSeekFilter = (
   cursor: CountDateIdCursor,
   countField: string

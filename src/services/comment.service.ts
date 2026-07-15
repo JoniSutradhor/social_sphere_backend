@@ -3,6 +3,8 @@ import { Comment, type IComment } from "../models/comment.model.js";
 import { Post } from "../models/post.model.js";
 import { Reaction } from "../models/reaction.model.js";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/ApiError.js";
+import { assertPostVisible } from "../utils/visibility.js";
+import { attachViewerReactions } from "./reaction.service.js";
 import {
   countDateIdSeekFilter,
   dateIdSeekFilter,
@@ -44,8 +46,15 @@ const buildPage = <T extends { _id: mongoose.Types.ObjectId; createdAt: Date; li
 
 export const getTopLevelComments = async (
   postId: string,
+  viewerId: string | undefined,
   options: { cursor?: string; limit: number; sortBy: "newest" | "mostLiked" }
 ) => {
+  const post = await Post.findById(postId).select("user visibility isDeleted");
+  if (!post || post.isDeleted) {
+    throw new NotFoundError("Post not found");
+  }
+  assertPostVisible(post, viewerId);
+
   const filter: mongoose.FilterQuery<IComment> = { postId, parentId: null, isDeleted: false };
 
   if (options.cursor) {
@@ -69,13 +78,28 @@ export const getTopLevelComments = async (
     .populate("user", USER_PROJECTION)
     .lean();
 
-  return buildPage(docs, options.limit, options.sortBy);
+  const page = buildPage(docs, options.limit, options.sortBy);
+  const data = await attachViewerReactions(page.data, "Comment", viewerId);
+
+  return { ...page, data };
 };
 
 export const getReplies = async (
   parentId: string,
+  viewerId: string | undefined,
   options: { cursor?: string; limit: number }
 ) => {
+  const parent = await Comment.findById(parentId).select("postId isDeleted");
+  if (!parent || parent.isDeleted) {
+    throw new NotFoundError("Comment not found");
+  }
+
+  const post = await Post.findById(parent.postId).select("user visibility isDeleted");
+  if (!post || post.isDeleted) {
+    throw new NotFoundError("Post not found");
+  }
+  assertPostVisible(post, viewerId);
+
   const filter: mongoose.FilterQuery<IComment> = { parentId, isDeleted: false };
 
   if (options.cursor) {
@@ -89,7 +113,10 @@ export const getReplies = async (
     .populate("user", USER_PROJECTION)
     .lean();
 
-  return buildPage(docs, options.limit, "newest");
+  const page = buildPage(docs, options.limit, "newest");
+  const data = await attachViewerReactions(page.data, "Comment", viewerId);
+
+  return { ...page, data };
 };
 
 export const createComment = async (input: {
@@ -110,9 +137,14 @@ export const createComment = async (input: {
     if (parent.parentId) {
       throw new BadRequestError("Cannot reply to a reply");
     }
+
+    const parentPost = await Post.findById(parent.postId);
+    if (!parentPost || parentPost.isDeleted) {
+      throw new NotFoundError("Post not found");
+    }
+    assertPostVisible(parentPost, input.userId);
+
     rootId = parent._id;
-    // A reply always belongs to its parent's post — never trust a client-supplied
-    // postId here, or a reply could be spoofed onto an unrelated post's stream.
     postId = String(parent.postId);
   } else {
     if (!postId) {
@@ -122,6 +154,7 @@ export const createComment = async (input: {
     if (!post || post.isDeleted) {
       throw new NotFoundError("Post not found");
     }
+    assertPostVisible(post, input.userId);
   }
 
   const comment = await Comment.create({
@@ -173,7 +206,6 @@ export const updateComment = async (
 
   await comment.save();
 
-  // Replaced or explicitly cleared — the old file is now orphaned, clean it up.
   if (oldImageUrl && oldImageUrl !== comment.imageUrl) {
     deleteUploadedFile(oldImageUrl);
   }
@@ -204,9 +236,6 @@ export const deleteComment = async (commentId: string, userId: string) => {
     await comment.save();
   } else {
     await comment.deleteOne();
-    // Comment is gone for good (unlike the soft-delete tombstone above, which
-    // keeps the record around) — its reactions would otherwise sit orphaned
-    // in the Reaction collection forever.
     await Reaction.deleteMany({ targetType: "Comment", targetId: comment._id });
     if (comment.parentId) {
       await Comment.findByIdAndUpdate(comment.parentId, { $inc: { replyCount: -1 } });

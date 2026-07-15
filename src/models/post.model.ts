@@ -1,9 +1,12 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
 
+export type PostVisibility = "public" | "private";
+
 export interface IPost {
   user: mongoose.Types.ObjectId;
   content: string;
   imageUrl: string | null;
+  visibility: PostVisibility;
   likeCount: number;
   dislikeCount: number;
   commentCount: number;
@@ -32,6 +35,11 @@ const postSchema = new Schema<IPost, PostModel>(
     imageUrl: {
       type: String,
       default: null,
+    },
+    visibility: {
+      type: String,
+      enum: ["public", "private"],
+      default: "public",
     },
     likeCount: {
       type: Number,
@@ -63,9 +71,7 @@ const postSchema = new Schema<IPost, PostModel>(
   }
 );
 
-// Feed listing, newest-first (keyset cursor on createdAt/_id).
 postSchema.index({ isDeleted: 1, createdAt: -1, _id: -1 });
-// Feed listing, most-liked-first.
 postSchema.index({ isDeleted: 1, likeCount: -1, createdAt: -1, _id: -1 });
 
 export const Post = mongoose.model<IPost, PostModel>("Post", postSchema);

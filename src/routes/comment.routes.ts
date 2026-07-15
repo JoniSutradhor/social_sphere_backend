@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getComments,
   getReplies,
+  getCommentLikes,
   createComment,
   addReply,
   updateComment,
@@ -9,7 +10,7 @@ import {
   likeComment,
   dislikeComment,
 } from "../controllers/comment.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, optionalAuth } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import { commentMutationRateLimiter } from "../middleware/rateLimit.middleware.js";
 import { uploadImage } from "../middleware/upload.middleware.js";
@@ -20,12 +21,13 @@ import {
   listCommentsQuerySchema,
   listRepliesQuerySchema,
 } from "../validators/comment.validators.js";
-import { idParamOnlySchema } from "../validators/common.js";
+import { idParamOnlySchema, listReactorsQuerySchema } from "../validators/common.js";
 
 const router = Router();
 
-router.get("/", validate(listCommentsQuerySchema), getComments);
-router.get("/:id/replies", validate(listRepliesQuerySchema), getReplies);
+router.get("/", optionalAuth, validate(listCommentsQuerySchema), getComments);
+router.get("/:id/replies", optionalAuth, validate(listRepliesQuerySchema), getReplies);
+router.get("/:id/likes", optionalAuth, validate(listReactorsQuerySchema), getCommentLikes);
 
 router.post(
   "/",

@@ -17,13 +17,6 @@ interface SocketData {
   userId?: string;
 }
 
-/**
- * Client -> server events are limited to room membership (`join-post`/`leave-post`).
- * All post/comment/reaction mutation events are emitted server-side (see src/sockets/emitter.ts),
- * only after a mutation is actually persisted via the authenticated REST path — clients
- * can no longer forge a fake `new-comment`/`comment-liked`/etc event for content that
- * doesn't exist, which the previous implementation allowed.
- */
 export const initSockets = (httpServer: HttpServer): SocketIOServer => {
   const io = new SocketIOServer<any, any, any, SocketData>(httpServer, {
     cors: {
@@ -32,8 +25,6 @@ export const initSockets = (httpServer: HttpServer): SocketIOServer => {
     },
   });
 
-  // Anonymous connections stay allowed (mirrors the public GET /api/comments route);
-  // a valid JWT just attaches the authenticated user id for potential future use.
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
 
@@ -45,9 +36,7 @@ export const initSockets = (httpServer: HttpServer): SocketIOServer => {
       const payload = jwt.verify(token, env.JWT_SECRET) as HandshakeAuthPayload;
       socket.data.userId = payload.id;
     } catch {
-      // Stale/expired token on an otherwise-anonymous-allowed socket: ignore
-      // rather than reject, so it doesn't just break real-time updates for a
-      // valid read-only viewer.
+      // ignore invalid token
     }
 
     next();

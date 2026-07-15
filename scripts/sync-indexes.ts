@@ -1,15 +1,3 @@
-/**
- * One-off: drops indexes that no longer match the current schema (e.g. the old
- * per-collection `pageId`/`commentId` shapes) and creates the ones defined on
- * the current models. Run after any schema change that adds/removes/renames an
- * indexed field — Mongoose's autoIndex only adds new indexes, it never drops
- * stale ones, and a stale unique index can reject otherwise-valid writes.
- *
- * Also backfills reaction docs from the pre-Post `commentId` shape to the
- * current polymorphic `targetType`/`targetId` shape — the new unique index on
- * (targetType, targetId, userId) can't build while old docs still lack those
- * fields (they'd all collide as duplicate `null` keys).
- */
 import mongoose from "mongoose";
 import { connectDB } from "../src/config/db.js";
 import { Post } from "../src/models/post.model.js";

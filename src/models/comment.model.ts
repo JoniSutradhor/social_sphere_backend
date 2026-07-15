@@ -81,13 +81,9 @@ const commentSchema = new Schema<IComment, CommentModel>(
   }
 );
 
-// Top-level comments for a post, newest-first (keyset cursor on createdAt/_id).
 commentSchema.index({ postId: 1, parentId: 1, createdAt: -1, _id: -1 });
-// Top-level comments for a post, most-liked-first.
 commentSchema.index({ postId: 1, parentId: 1, likeCount: -1, createdAt: -1, _id: -1 });
-// Replies of a given parent, oldest-first (thread reading order).
 commentSchema.index({ parentId: 1, createdAt: 1, _id: 1 });
-// Cheap whole-thread lookup by top-level ancestor; low-cost future-proofing for deeper nesting.
 commentSchema.index({ rootId: 1, createdAt: 1 });
 
 export const Comment = mongoose.model<IComment, CommentModel>("Comment", commentSchema);

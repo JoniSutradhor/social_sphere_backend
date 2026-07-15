@@ -6,17 +6,25 @@ import type {
   ListCommentsQuery,
   ListRepliesQuery,
 } from "../validators/comment.validators.js";
+import type { ListReactorsQuery } from "../validators/common.js";
 
 export const getComments = asyncHandler(async (req, res) => {
   const { postId, cursor, limit, sortBy } = req.validatedQuery as ListCommentsQuery;
-  const result = await commentService.getTopLevelComments(postId, { cursor, limit, sortBy });
+  const result = await commentService.getTopLevelComments(postId, req.user?.id, { cursor, limit, sortBy });
   res.json(result);
 });
 
 export const getReplies = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
   const { cursor, limit } = req.validatedQuery as ListRepliesQuery;
-  const result = await commentService.getReplies(id, { cursor, limit });
+  const result = await commentService.getReplies(id, req.user?.id, { cursor, limit });
+  res.json(result);
+});
+
+export const getCommentLikes = asyncHandler(async (req, res) => {
+  const { id } = req.params as { id: string };
+  const { cursor, limit } = req.validatedQuery as ListReactorsQuery;
+  const result = await reactionService.getReactors("Comment", id, "like", req.user?.id, { cursor, limit });
   res.json(result);
 });
 

@@ -2,23 +2,25 @@ import { Router } from "express";
 import {
   getPosts,
   getPost,
+  getPostLikes,
   createPost,
   updatePost,
   deletePost,
   likePost,
   dislikePost,
 } from "../controllers/post.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, optionalAuth } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import { postMutationRateLimiter } from "../middleware/rateLimit.middleware.js";
 import { uploadImage } from "../middleware/upload.middleware.js";
 import { createPostSchema, updatePostSchema, listPostsQuerySchema } from "../validators/post.validators.js";
-import { idParamOnlySchema } from "../validators/common.js";
+import { idParamOnlySchema, listReactorsQuerySchema } from "../validators/common.js";
 
 const router = Router();
 
-router.get("/", validate(listPostsQuerySchema), getPosts);
-router.get("/:id", validate(idParamOnlySchema), getPost);
+router.get("/", optionalAuth, validate(listPostsQuerySchema), getPosts);
+router.get("/:id", optionalAuth, validate(idParamOnlySchema), getPost);
+router.get("/:id/likes", optionalAuth, validate(listReactorsQuerySchema), getPostLikes);
 
 router.post(
   "/",

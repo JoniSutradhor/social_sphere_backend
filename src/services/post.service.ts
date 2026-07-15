@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
-import { Post, type IPost } from "../models/post.model.js";
+import { Post, type IPost, type PostVisibility } from "../models/post.model.js";
 import { Reaction } from "../models/reaction.model.js";
 import { ForbiddenError, NotFoundError } from "../utils/ApiError.js";
+import { assertPostVisible } from "../utils/visibility.js";
+import { attachViewerReactions } from "./reaction.service.js";
 import {
   countDateIdSeekFilter,
   dateIdSeekFilter,
@@ -41,22 +43,24 @@ const buildPage = <T extends { _id: mongoose.Types.ObjectId; createdAt: Date; li
   return { data: page, pagination: { nextCursor, hasMore } };
 };
 
-export const getFeed = async (options: {
-  cursor?: string;
-  limit: number;
-  sortBy: "newest" | "mostLiked";
-}) => {
+export const getFeed = async (
+  options: { cursor?: string; limit: number; sortBy: "newest" | "mostLiked" },
+  viewerId?: string
+) => {
   const filter: mongoose.FilterQuery<IPost> = { isDeleted: false };
+  const andClauses: mongoose.FilterQuery<IPost>[] = [
+    viewerId ? { $or: [{ visibility: "public" }, { user: viewerId }] } : { visibility: "public" },
+  ];
 
   if (options.cursor) {
-    if (options.sortBy === "mostLiked") {
-      const decoded = decodeCursor<CountDateIdCursor>(options.cursor);
-      Object.assign(filter, countDateIdSeekFilter(decoded, "likeCount"));
-    } else {
-      const decoded = decodeCursor<DateIdCursor>(options.cursor);
-      Object.assign(filter, dateIdSeekFilter(decoded, "desc"));
-    }
+    andClauses.push(
+      options.sortBy === "mostLiked"
+        ? countDateIdSeekFilter(decodeCursor<CountDateIdCursor>(options.cursor), "likeCount")
+        : dateIdSeekFilter(decodeCursor<DateIdCursor>(options.cursor), "desc")
+    );
   }
+
+  filter.$and = andClauses;
 
   const sort: Record<string, 1 | -1> =
     options.sortBy === "mostLiked"
@@ -69,24 +73,35 @@ export const getFeed = async (options: {
     .populate("user", USER_PROJECTION)
     .lean();
 
-  return buildPage(docs, options.limit, options.sortBy);
+  const page = buildPage(docs, options.limit, options.sortBy);
+  const data = await attachViewerReactions(page.data, "Post", viewerId);
+
+  return { ...page, data };
 };
 
-export const getPostById = async (postId: string) => {
-  const post = await Post.findById(postId).populate("user", USER_PROJECTION);
+export const getPostById = async (postId: string, viewerId?: string) => {
+  const post = await Post.findById(postId).populate("user", USER_PROJECTION).lean();
 
   if (!post || post.isDeleted) {
     throw new NotFoundError("Post not found");
   }
+  assertPostVisible(post, viewerId);
 
-  return post;
+  const [withReaction] = await attachViewerReactions([post], "Post", viewerId);
+  return withReaction;
 };
 
-export const createPost = async (input: { userId: string; content: string; imageUrl?: string }) => {
+export const createPost = async (input: {
+  userId: string;
+  content: string;
+  imageUrl?: string;
+  visibility?: PostVisibility;
+}) => {
   const post = await Post.create({
     user: input.userId,
     content: input.content,
     imageUrl: input.imageUrl ?? null,
+    visibility: input.visibility ?? "public",
   });
 
   return post.populate("user", USER_PROJECTION);
@@ -96,7 +111,7 @@ export const updatePost = async (
   postId: string,
   userId: string,
   content: string,
-  options: { imageUrl?: string; removeImage?: boolean } = {}
+  options: { imageUrl?: string; removeImage?: boolean; visibility?: PostVisibility } = {}
 ) => {
   const post = await Post.findById(postId);
 
@@ -119,9 +134,12 @@ export const updatePost = async (
     post.imageUrl = null;
   }
 
+  if (options.visibility) {
+    post.visibility = options.visibility;
+  }
+
   await post.save();
 
-  // Replaced or explicitly cleared — the old file is now orphaned, clean it up.
   if (oldImageUrl && oldImageUrl !== post.imageUrl) {
     deleteUploadedFile(oldImageUrl);
   }
@@ -152,7 +170,6 @@ export const deletePost = async (postId: string, userId: string) => {
     await post.save();
   } else {
     await post.deleteOne();
-    // No comments reference this post, so the only orphan risk is its own reactions.
     await Reaction.deleteMany({ targetType: "Post", targetId: post._id });
   }
 

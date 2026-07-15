@@ -1,11 +1,3 @@
-/**
- * One-off migration: splits the old embedded comment shape
- * ({ likes: [ObjectId], dislikes: [ObjectId], replies: [{user,content,createdAt}] })
- * into the new flat Comment collection (parentId-based replies) + a separate
- * Reaction collection. Safe to re-run: already-migrated docs (parentId !== undefined)
- * are skipped. Not a general-purpose migration framework — the live dataset here
- * is a handful of documents.
- */
 import mongoose from "mongoose";
 import { connectDB } from "../src/config/db.js";
 import { Comment } from "../src/models/comment.model.js";
@@ -97,10 +89,6 @@ const run = async () => {
     }
 
     if (replies.length > 0) {
-      // Written via the raw driver, not the Comment model: this predates the Post
-      // model, so legacy replies only ever carried the old string pageId, not a
-      // real postId. Backfilling actual Post documents for this data is a separate
-      // concern from this shape migration.
       await rawCollection.insertMany(
         replies.map((reply) => ({
           _id: new mongoose.Types.ObjectId(),

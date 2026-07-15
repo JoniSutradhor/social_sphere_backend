@@ -23,8 +23,6 @@ export const createApp = (): Express => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Helmet's default Cross-Origin-Resource-Policy (same-origin) would block the
-  // frontend (a different origin in dev) from actually rendering these images.
   app.use(
     "/uploads",
     (_req, res, next) => {

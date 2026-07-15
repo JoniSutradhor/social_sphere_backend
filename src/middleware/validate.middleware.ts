@@ -24,7 +24,6 @@ export const validate =
     const parsed = result.data;
     if (parsed.body !== undefined) req.body = parsed.body;
     if (parsed.params !== undefined) req.params = parsed.params as Request["params"];
-    // req.query has no setter in Express 5 — stash validated/coerced query separately.
     if (parsed.query !== undefined) req.validatedQuery = parsed.query;
 
     next();

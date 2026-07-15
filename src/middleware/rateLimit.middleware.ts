@@ -5,7 +5,6 @@ const tooManyRequests = (code: string, message: string) => ({
   error: { code, message },
 });
 
-// Brute-force / credential-stuffing protection on auth endpoints.
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -14,8 +13,6 @@ export const authRateLimiter = rateLimit({
   message: tooManyRequests("TOO_MANY_REQUESTS", "Too many attempts, please try again later"),
 });
 
-// Looser limiter for post/comment mutations; keyed by user id when authenticated
-// (this middleware runs after `protect` on these routes) rather than raw IP.
 const createMutationRateLimiter = () =>
   rateLimit({
     windowMs: 60 * 1000,
