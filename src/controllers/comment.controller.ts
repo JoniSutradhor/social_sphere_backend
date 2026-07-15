@@ -1,4 +1,5 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendSuccess } from "../utils/ApiResponse.js";
 import * as commentService from "../services/comment.service.js";
 import * as reactionService from "../services/reaction.service.js";
 import type {
@@ -10,22 +11,29 @@ import type { ListReactorsQuery } from "../validators/common.js";
 
 export const getComments = asyncHandler(async (req, res) => {
   const { postId, cursor, limit, sortBy } = req.validatedQuery as ListCommentsQuery;
-  const result = await commentService.getTopLevelComments(postId, req.user?.id, { cursor, limit, sortBy });
-  res.json(result);
+  const { data, pagination } = await commentService.getTopLevelComments(postId, req.user?.id, {
+    cursor,
+    limit,
+    sortBy,
+  });
+  sendSuccess(res, { message: "Comments fetched successfully", data, pagination });
 });
 
 export const getReplies = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
   const { cursor, limit } = req.validatedQuery as ListRepliesQuery;
-  const result = await commentService.getReplies(id, req.user?.id, { cursor, limit });
-  res.json(result);
+  const { data, pagination } = await commentService.getReplies(id, req.user?.id, { cursor, limit });
+  sendSuccess(res, { message: "Replies fetched successfully", data, pagination });
 });
 
 export const getCommentLikes = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
   const { cursor, limit } = req.validatedQuery as ListReactorsQuery;
-  const result = await reactionService.getReactors("Comment", id, "like", req.user?.id, { cursor, limit });
-  res.json(result);
+  const { data, pagination } = await reactionService.getReactors("Comment", id, "like", req.user?.id, {
+    cursor,
+    limit,
+  });
+  sendSuccess(res, { message: "Comment likes fetched successfully", data, pagination });
 });
 
 export const createComment = asyncHandler(async (req, res) => {
@@ -38,7 +46,7 @@ export const createComment = asyncHandler(async (req, res) => {
     parentId,
     imageUrl,
   });
-  res.status(201).json(comment);
+  sendSuccess(res, { statusCode: 201, message: "Comment created successfully", data: comment });
 });
 
 export const addReply = asyncHandler(async (req, res) => {
@@ -49,7 +57,7 @@ export const addReply = asyncHandler(async (req, res) => {
     content,
     parentId: id,
   });
-  res.status(201).json(comment);
+  sendSuccess(res, { statusCode: 201, message: "Reply added successfully", data: comment });
 });
 
 export const updateComment = asyncHandler(async (req, res) => {
@@ -57,23 +65,23 @@ export const updateComment = asyncHandler(async (req, res) => {
   const { content, removeImage } = req.body as { content: string; removeImage?: boolean };
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
   const comment = await commentService.updateComment(id, req.user!.id, content, { imageUrl, removeImage });
-  res.json(comment);
+  sendSuccess(res, { message: "Comment updated successfully", data: comment });
 });
 
 export const deleteComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
-  const result = await commentService.deleteComment(id, req.user!.id);
-  res.json(result);
+  const { message } = await commentService.deleteComment(id, req.user!.id);
+  sendSuccess(res, { message });
 });
 
 export const likeComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
   const result = await reactionService.toggleReaction("Comment", id, req.user!.id, "like");
-  res.json(result);
+  sendSuccess(res, { message: "Reaction updated successfully", data: result });
 });
 
 export const dislikeComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
   const result = await reactionService.toggleReaction("Comment", id, req.user!.id, "dislike");
-  res.json(result);
+  sendSuccess(res, { message: "Reaction updated successfully", data: result });
 });
