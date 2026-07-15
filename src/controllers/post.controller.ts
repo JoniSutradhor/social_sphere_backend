@@ -27,7 +27,7 @@ export const createPost = asyncHandler(async (req, res) => {
   const { content, visibility } = req.body as CreatePostInput;
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
   const post = await postService.createPost({ userId: req.user!.id, content, imageUrl, visibility });
-  res.status(201).json(post);
+  res.status(201).json({ ...post.toObject(), message: "Post created successfully" });
 });
 
 export const updatePost = asyncHandler(async (req, res) => {
