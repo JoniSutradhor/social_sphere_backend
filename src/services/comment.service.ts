@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Comment, type IComment } from "../models/comment.model.js";
+import { Post } from "../models/post.model.js";
 import { Reaction } from "../models/reaction.model.js";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/ApiError.js";
 import {
@@ -10,7 +11,7 @@ import {
   type CountDateIdCursor,
   type DateIdCursor,
 } from "../utils/pagination.js";
-import { emitToPage } from "../sockets/emitter.js";
+import { emitToPost } from "../sockets/emitter.js";
 import { deleteUploadedFile } from "../middleware/upload.middleware.js";
 
 const USER_PROJECTION = "firstName lastName avatar";
@@ -42,10 +43,10 @@ const buildPage = <T extends { _id: mongoose.Types.ObjectId; createdAt: Date; li
 };
 
 export const getTopLevelComments = async (
-  pageId: string,
+  postId: string,
   options: { cursor?: string; limit: number; sortBy: "newest" | "mostLiked" }
 ) => {
-  const filter: mongoose.FilterQuery<IComment> = { pageId, parentId: null, isDeleted: false };
+  const filter: mongoose.FilterQuery<IComment> = { postId, parentId: null, isDeleted: false };
 
   if (options.cursor) {
     if (options.sortBy === "mostLiked") {
@@ -94,12 +95,12 @@ export const getReplies = async (
 export const createComment = async (input: {
   userId: string;
   content: string;
-  pageId?: string;
+  postId?: string;
   parentId?: string;
   imageUrl?: string;
 }) => {
   let rootId: mongoose.Types.ObjectId | null = null;
-  let pageId = input.pageId;
+  let postId = input.postId;
 
   if (input.parentId) {
     const parent = await Comment.findById(input.parentId);
@@ -110,18 +111,22 @@ export const createComment = async (input: {
       throw new BadRequestError("Cannot reply to a reply");
     }
     rootId = parent._id;
-    // A reply always belongs to its parent's page — never trust a client-supplied
-    // pageId here, or a reply could be spoofed onto an unrelated page's stream.
-    pageId = parent.pageId;
-  }
-
-  if (!pageId) {
-    throw new BadRequestError("pageId is required");
+    // A reply always belongs to its parent's post — never trust a client-supplied
+    // postId here, or a reply could be spoofed onto an unrelated post's stream.
+    postId = String(parent.postId);
+  } else {
+    if (!postId) {
+      throw new BadRequestError("postId is required");
+    }
+    const post = await Post.findById(postId);
+    if (!post || post.isDeleted) {
+      throw new NotFoundError("Post not found");
+    }
   }
 
   const comment = await Comment.create({
     user: input.userId,
-    pageId,
+    postId,
     parentId: input.parentId ?? null,
     rootId,
     content: input.content,
@@ -131,9 +136,10 @@ export const createComment = async (input: {
   if (input.parentId) {
     await Comment.findByIdAndUpdate(input.parentId, { $inc: { replyCount: 1 } });
   }
+  await Post.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
 
   const populated = await comment.populate("user", USER_PROJECTION);
-  emitToPage(pageId, "comment-created", populated);
+  emitToPost(postId, "comment-created", populated);
 
   return populated;
 };
@@ -173,7 +179,7 @@ export const updateComment = async (
   }
 
   const populated = await comment.populate("user", USER_PROJECTION);
-  emitToPage(comment.pageId, "comment-updated", populated);
+  emitToPost(String(comment.postId), "comment-updated", populated);
 
   return populated;
 };
@@ -201,17 +207,18 @@ export const deleteComment = async (commentId: string, userId: string) => {
     // Comment is gone for good (unlike the soft-delete tombstone above, which
     // keeps the record around) — its reactions would otherwise sit orphaned
     // in the Reaction collection forever.
-    await Reaction.deleteMany({ commentId: comment._id });
+    await Reaction.deleteMany({ targetType: "Comment", targetId: comment._id });
     if (comment.parentId) {
       await Comment.findByIdAndUpdate(comment.parentId, { $inc: { replyCount: -1 } });
     }
+    await Post.findByIdAndUpdate(comment.postId, { $inc: { commentCount: -1 } });
   }
 
   if (imageUrl) {
     deleteUploadedFile(imageUrl);
   }
 
-  emitToPage(comment.pageId, "comment-deleted", { id: comment.id, parentId: comment.parentId });
+  emitToPost(String(comment.postId), "comment-deleted", { id: comment.id, parentId: comment.parentId });
 
   return { message: "Comment deleted successfully" };
 };

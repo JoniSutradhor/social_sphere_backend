@@ -10,19 +10,17 @@ const contentSchema = z
   .string()
   .trim()
   .min(1, "Content is required")
-  .max(2000, "Comment cannot exceed 2000 characters")
+  .max(5000, "Post cannot exceed 5000 characters")
   .transform(stripMarkup)
   .pipe(z.string().min(1, "Content is required"));
 
-export const createCommentSchema = z.object({
+export const createPostSchema = z.object({
   body: z.object({
     content: contentSchema,
-    postId: objectIdSchema.optional(),
-    parentId: objectIdSchema.optional(),
   }),
 });
 
-export const updateCommentSchema = z.object({
+export const updatePostSchema = z.object({
   body: z.object({
     content: contentSchema,
     // multipart fields arrive as strings, hence the coercion
@@ -31,30 +29,14 @@ export const updateCommentSchema = z.object({
   params: z.object({ id: objectIdSchema }),
 });
 
-export const addReplySchema = z.object({
-  body: z.object({
-    content: contentSchema,
-  }),
-  params: z.object({ id: objectIdSchema }),
-});
-
-export const listCommentsQuerySchema = z.object({
+export const listPostsQuerySchema = z.object({
   query: z.object({
-    postId: objectIdSchema,
     cursor: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(50).default(10),
     sortBy: z.enum(["newest", "mostLiked"]).default("newest"),
   }),
 });
 
-export const listRepliesQuerySchema = z.object({
-  params: z.object({ id: objectIdSchema }),
-  query: z.object({
-    cursor: z.string().optional(),
-    limit: z.coerce.number().int().min(1).max(50).default(10),
-  }),
-});
-
-export type CreateCommentInput = z.infer<typeof createCommentSchema>["body"];
-export type ListCommentsQuery = z.infer<typeof listCommentsQuerySchema>["query"];
-export type ListRepliesQuery = z.infer<typeof listRepliesQuerySchema>["query"];
+export type CreatePostInput = z.infer<typeof createPostSchema>["body"];
+export type UpdatePostInput = z.infer<typeof updatePostSchema>["body"];
+export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>["query"];

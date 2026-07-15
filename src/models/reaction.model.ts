@@ -1,9 +1,12 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
 
 export type ReactionType = "like" | "dislike";
+// Doubles as the Mongoose model name for `targetId`'s refPath.
+export type ReactionTargetType = "Post" | "Comment";
 
 export interface IReaction {
-  commentId: mongoose.Types.ObjectId;
+  targetType: ReactionTargetType;
+  targetId: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   type: ReactionType;
   createdAt: Date;
@@ -15,10 +18,15 @@ export type ReactionDocument = HydratedDocument<IReaction>;
 
 const reactionSchema = new Schema<IReaction, ReactionModel>(
   {
-    commentId: {
-      type: Schema.Types.ObjectId,
-      ref: "Comment",
+    targetType: {
+      type: String,
+      enum: ["Post", "Comment"],
       required: true,
+    },
+    targetId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      refPath: "targetType",
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -37,7 +45,7 @@ const reactionSchema = new Schema<IReaction, ReactionModel>(
   }
 );
 
-// One reaction per user per comment; also the lookup index for "did this user already react".
-reactionSchema.index({ commentId: 1, userId: 1 }, { unique: true });
+// One reaction per user per target; also the lookup index for "did this user already react".
+reactionSchema.index({ targetType: 1, targetId: 1, userId: 1 }, { unique: true });
 
 export const Reaction = mongoose.model<IReaction, ReactionModel>("Reaction", reactionSchema);

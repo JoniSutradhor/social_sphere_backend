@@ -7,7 +7,7 @@ import { allowedOrigins } from "../config/cors.js";
 import { logger } from "../utils/logger.js";
 import { setSocketServer } from "./emitter.js";
 
-const joinPageSchema = z.string().trim().min(1).max(200);
+const joinPostSchema = z.string().trim().min(1).max(200);
 
 interface HandshakeAuthPayload {
   id: string;
@@ -18,8 +18,8 @@ interface SocketData {
 }
 
 /**
- * Client -> server events are limited to room membership (`join-page`/`leave-page`).
- * All comment/reaction mutation events are emitted server-side (see src/sockets/emitter.ts),
+ * Client -> server events are limited to room membership (`join-post`/`leave-post`).
+ * All post/comment/reaction mutation events are emitted server-side (see src/sockets/emitter.ts),
  * only after a mutation is actually persisted via the authenticated REST path — clients
  * can no longer forge a fake `new-comment`/`comment-liked`/etc event for content that
  * doesn't exist, which the previous implementation allowed.
@@ -56,14 +56,14 @@ export const initSockets = (httpServer: HttpServer): SocketIOServer => {
   io.on("connection", (socket) => {
     logger.debug({ socketId: socket.id, userId: socket.data.userId }, "Socket connected");
 
-    socket.on("join-page", (pageId: unknown) => {
-      const parsed = joinPageSchema.safeParse(pageId);
+    socket.on("join-post", (postId: unknown) => {
+      const parsed = joinPostSchema.safeParse(postId);
       if (!parsed.success) return;
       socket.join(parsed.data);
     });
 
-    socket.on("leave-page", (pageId: unknown) => {
-      const parsed = joinPageSchema.safeParse(pageId);
+    socket.on("leave-post", (postId: unknown) => {
+      const parsed = joinPostSchema.safeParse(postId);
       if (!parsed.success) return;
       socket.leave(parsed.data);
     });

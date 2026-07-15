@@ -75,14 +75,16 @@ const run = async () => {
       await Reaction.insertMany(
         [
           ...likes.map((userId) => ({
-            commentId: doc._id,
+            targetType: "Comment" as const,
+            targetId: doc._id,
             userId,
             type: "like" as const,
             createdAt: doc.createdAt ?? new Date(),
             updatedAt: doc.createdAt ?? new Date(),
           })),
           ...dislikes.map((userId) => ({
-            commentId: doc._id,
+            targetType: "Comment" as const,
+            targetId: doc._id,
             userId,
             type: "dislike" as const,
             createdAt: doc.createdAt ?? new Date(),
@@ -95,8 +97,13 @@ const run = async () => {
     }
 
     if (replies.length > 0) {
-      await Comment.insertMany(
+      // Written via the raw driver, not the Comment model: this predates the Post
+      // model, so legacy replies only ever carried the old string pageId, not a
+      // real postId. Backfilling actual Post documents for this data is a separate
+      // concern from this shape migration.
+      await rawCollection.insertMany(
         replies.map((reply) => ({
+          _id: new mongoose.Types.ObjectId(),
           user: reply.user,
           pageId,
           parentId: doc._id,

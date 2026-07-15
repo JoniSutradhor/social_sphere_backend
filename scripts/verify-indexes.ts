@@ -5,7 +5,7 @@ import { logger } from "../src/utils/logger.js";
 const run = async () => {
   await connectDB();
 
-  for (const name of ["users", "comments", "reactions"]) {
+  for (const name of ["users", "posts", "comments", "reactions"]) {
     const indexes = await mongoose.connection.db!.collection(name).indexes();
     logger.info({ collection: name, indexes }, "Indexes");
   }

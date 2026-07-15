@@ -2,7 +2,7 @@ import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
 
 export interface IComment {
   user: mongoose.Types.ObjectId;
-  pageId: string;
+  postId: mongoose.Types.ObjectId;
   parentId: mongoose.Types.ObjectId | null;
   rootId: mongoose.Types.ObjectId | null;
   content: string;
@@ -26,10 +26,10 @@ const commentSchema = new Schema<IComment, CommentModel>(
       ref: "User",
       required: true,
     },
-    pageId: {
-      type: String,
+    postId: {
+      type: Schema.Types.ObjectId,
+      ref: "Post",
       required: true,
-      default: "main",
     },
     parentId: {
       type: Schema.Types.ObjectId,
@@ -81,10 +81,10 @@ const commentSchema = new Schema<IComment, CommentModel>(
   }
 );
 
-// Top-level comments for a page, newest-first (keyset cursor on createdAt/_id).
-commentSchema.index({ pageId: 1, parentId: 1, createdAt: -1, _id: -1 });
-// Top-level comments for a page, most-liked-first.
-commentSchema.index({ pageId: 1, parentId: 1, likeCount: -1, createdAt: -1, _id: -1 });
+// Top-level comments for a post, newest-first (keyset cursor on createdAt/_id).
+commentSchema.index({ postId: 1, parentId: 1, createdAt: -1, _id: -1 });
+// Top-level comments for a post, most-liked-first.
+commentSchema.index({ postId: 1, parentId: 1, likeCount: -1, createdAt: -1, _id: -1 });
 // Replies of a given parent, oldest-first (thread reading order).
 commentSchema.index({ parentId: 1, createdAt: 1, _id: 1 });
 // Cheap whole-thread lookup by top-level ancestor; low-cost future-proofing for deeper nesting.

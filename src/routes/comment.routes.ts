@@ -16,11 +16,11 @@ import { uploadImage } from "../middleware/upload.middleware.js";
 import {
   createCommentSchema,
   updateCommentSchema,
-  idParamOnlySchema,
   addReplySchema,
   listCommentsQuerySchema,
   listRepliesQuerySchema,
 } from "../validators/comment.validators.js";
+import { idParamOnlySchema } from "../validators/common.js";
 
 const router = Router();
 

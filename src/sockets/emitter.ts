@@ -6,6 +6,6 @@ export const setSocketServer = (server: SocketIOServer): void => {
   io = server;
 };
 
-export const emitToPage = (pageId: string, event: string, payload: unknown): void => {
-  io?.to(pageId).emit(event, payload);
+export const emitToPost = (postId: string, event: string, payload: unknown): void => {
+  io?.to(postId).emit(event, payload);
 };

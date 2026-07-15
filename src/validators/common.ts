@@ -5,6 +5,6 @@ export const objectIdSchema = z
   .string()
   .refine((val) => mongoose.Types.ObjectId.isValid(val), { message: "Invalid id" });
 
-export const idParamSchema = z.object({
-  id: objectIdSchema,
+export const idParamOnlySchema = z.object({
+  params: z.object({ id: objectIdSchema }),
 });

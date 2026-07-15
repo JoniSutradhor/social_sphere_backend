@@ -1,66 +1,80 @@
 import mongoose from "mongoose";
-import { Comment } from "../models/comment.model.js";
-import { Reaction, type ReactionType } from "../models/reaction.model.js";
+import { Comment, type CommentDocument } from "../models/comment.model.js";
+import { Post } from "../models/post.model.js";
+import { Reaction, type ReactionTargetType, type ReactionType } from "../models/reaction.model.js";
 import { NotFoundError } from "../utils/ApiError.js";
-import { emitToPage } from "../sockets/emitter.js";
+import { emitToPost } from "../sockets/emitter.js";
 
 const COUNT_FIELD = {
   like: "likeCount",
   dislike: "dislikeCount",
 } as const;
 
-export const toggleReaction = async (commentId: string, userId: string, type: ReactionType) => {
+export const toggleReaction = async (
+  targetType: ReactionTargetType,
+  targetId: string,
+  userId: string,
+  type: ReactionType
+) => {
   const session = await mongoose.startSession();
 
   try {
     let result:
-      | { likeCount: number; dislikeCount: number; userReaction: ReactionType | null; pageId: string }
+      | { likeCount: number; dislikeCount: number; userReaction: ReactionType | null; postId: string }
       | undefined;
 
     await session.withTransaction(async () => {
-      const comment = await Comment.findById(commentId).session(session);
-      if (!comment || comment.isDeleted) {
-        throw new NotFoundError("Comment not found");
+      const target =
+        targetType === "Post"
+          ? await Post.findById(targetId).session(session)
+          : await Comment.findById(targetId).session(session);
+
+      if (!target || target.isDeleted) {
+        throw new NotFoundError(`${targetType} not found`);
       }
 
-      const existing = await Reaction.findOne({ commentId, userId }).session(session);
+      const existing = await Reaction.findOne({ targetType, targetId, userId }).session(session);
 
       let userReaction: ReactionType | null = type;
 
       if (!existing) {
-        await Reaction.create([{ commentId, userId, type }], { session });
-        comment[COUNT_FIELD[type]] += 1;
+        await Reaction.create([{ targetType, targetId, userId, type }], { session });
+        target[COUNT_FIELD[type]] += 1;
       } else if (existing.type === type) {
         await existing.deleteOne({ session });
-        comment[COUNT_FIELD[type]] = Math.max(0, comment[COUNT_FIELD[type]] - 1);
+        target[COUNT_FIELD[type]] = Math.max(0, target[COUNT_FIELD[type]] - 1);
         userReaction = null;
       } else {
         const previousType = existing.type;
         existing.type = type;
         await existing.save({ session });
-        comment[COUNT_FIELD[previousType]] = Math.max(0, comment[COUNT_FIELD[previousType]] - 1);
-        comment[COUNT_FIELD[type]] += 1;
+        target[COUNT_FIELD[previousType]] = Math.max(0, target[COUNT_FIELD[previousType]] - 1);
+        target[COUNT_FIELD[type]] += 1;
       }
 
-      await comment.save({ session });
+      await target.save({ session });
 
       result = {
-        likeCount: comment.likeCount,
-        dislikeCount: comment.dislikeCount,
+        likeCount: target.likeCount,
+        dislikeCount: target.dislikeCount,
         userReaction,
-        pageId: comment.pageId,
+        postId: targetType === "Post" ? String(target._id) : String((target as CommentDocument).postId),
       };
     });
 
     if (!result) {
-      throw new NotFoundError("Comment not found");
+      throw new NotFoundError(`${targetType} not found`);
     }
 
-    emitToPage(result.pageId, "comment-reaction-updated", {
-      commentId,
-      likeCount: result.likeCount,
-      dislikeCount: result.dislikeCount,
-    });
+    emitToPost(
+      result.postId,
+      targetType === "Post" ? "post-reaction-updated" : "comment-reaction-updated",
+      {
+        [targetType === "Post" ? "postId" : "commentId"]: targetId,
+        likeCount: result.likeCount,
+        dislikeCount: result.dislikeCount,
+      }
+    );
 
     return result;
   } finally {

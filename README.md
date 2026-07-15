@@ -1,6 +1,6 @@
-# Comment System Backend
+# Social Sphere Backend
 
-TypeScript + Express + MongoDB (Mongoose) backend for a comment system: JWT auth, threaded comments with likes/dislikes, and real-time updates over Socket.IO.
+TypeScript + Express + MongoDB (Mongoose) backend for a small social feed: JWT auth, posts, threaded comments with likes/dislikes, and real-time updates over Socket.IO.
 
 ## Prerequisites
 
@@ -32,11 +32,11 @@ npm run dev
 
 ## Architecture
 
-- `src/models` — Mongoose schemas. Comments and replies share one flat `Comment` collection (`parentId` links a reply to its parent); likes/dislikes live in a separate `Reaction` collection with a unique `(commentId, userId)` index. Like/dislike counts are denormalized onto the comment document and updated atomically, so comment lists never have to compute counts at read time.
-- `src/services` — business logic; comment/reply listing uses cursor (keyset) pagination rather than offset pagination, so it stays fast regardless of collection size.
+- `src/models` — Mongoose schemas. `Post` is the root content type; comments and replies share one flat `Comment` collection (`postId` links a comment to its post, `parentId` links a reply to its parent). Likes/dislikes on both posts and comments live in a single polymorphic `Reaction` collection (`targetType` + `targetId`) with a unique `(targetType, targetId, userId)` index. Like/dislike/comment counts are denormalized onto the post/comment documents and updated atomically, so lists never have to compute counts at read time.
+- `src/services` — business logic; feed and comment/reply listing use cursor (keyset) pagination rather than offset pagination, so they stay fast regardless of collection size.
 - `src/controllers`, `src/routes` — thin HTTP layer; validation happens via `src/validators` (Zod) before a request reaches a controller.
 - `src/middleware` — auth (JWT), centralized error handling, request validation, rate limiting.
-- `src/sockets` — Socket.IO setup. Clients only ever send `join-page`/`leave-page`; all comment/reaction events are emitted server-side after a mutation is persisted via the authenticated REST API, so a client can't forge a fake real-time event.
+- `src/sockets` — Socket.IO setup. Clients only ever send `join-post`/`leave-post` (room = post id); all post/comment/reaction events are emitted server-side after a mutation is persisted via the authenticated REST API, so a client can't forge a fake real-time event.
 
 ## Real-time (Socket.IO) and serverless hosting
 

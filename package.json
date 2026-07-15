@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "migrate:comments": "tsx scripts/migrate-comments.ts",
+    "sync:indexes": "tsx scripts/sync-indexes.ts",
     "verify:indexes": "tsx scripts/verify-indexes.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -8,8 +8,8 @@ import type {
 } from "../validators/comment.validators.js";
 
 export const getComments = asyncHandler(async (req, res) => {
-  const { pageId, cursor, limit, sortBy } = req.validatedQuery as ListCommentsQuery;
-  const result = await commentService.getTopLevelComments(pageId, { cursor, limit, sortBy });
+  const { postId, cursor, limit, sortBy } = req.validatedQuery as ListCommentsQuery;
+  const result = await commentService.getTopLevelComments(postId, { cursor, limit, sortBy });
   res.json(result);
 });
 
@@ -21,12 +21,12 @@ export const getReplies = asyncHandler(async (req, res) => {
 });
 
 export const createComment = asyncHandler(async (req, res) => {
-  const { content, pageId, parentId } = req.body as CreateCommentInput;
+  const { content, postId, parentId } = req.body as CreateCommentInput;
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
   const comment = await commentService.createComment({
     userId: req.user!.id,
     content,
-    pageId,
+    postId,
     parentId,
     imageUrl,
   });
@@ -60,12 +60,12 @@ export const deleteComment = asyncHandler(async (req, res) => {
 
 export const likeComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
-  const result = await reactionService.toggleReaction(id, req.user!.id, "like");
+  const result = await reactionService.toggleReaction("Comment", id, req.user!.id, "like");
   res.json(result);
 });
 
 export const dislikeComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
-  const result = await reactionService.toggleReaction(id, req.user!.id, "dislike");
+  const result = await reactionService.toggleReaction("Comment", id, req.user!.id, "dislike");
   res.json(result);
 });
