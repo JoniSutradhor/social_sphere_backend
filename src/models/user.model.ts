@@ -45,7 +45,7 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     password: {
       type: String,
       required: [true, "Password is required"],
-      minlength: 10,
+      minlength: 8,
       select: false,
     },
     avatar: {

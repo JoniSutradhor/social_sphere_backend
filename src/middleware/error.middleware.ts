@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
-import { ApiError, BadRequestError, NotFoundError } from "../utils/ApiError.js";
+import mongoose from "mongoose";
+import { ApiError, BadRequestError, ConflictError, NotFoundError } from "../utils/ApiError.js";
 import { logger } from "../utils/logger.js";
 
 export const notFoundHandler = (req: Request, _res: Response, next: NextFunction): void => {
@@ -20,6 +21,20 @@ export const errorHandler = (
     );
   } else if (err instanceof Error && err.message.includes("Only JPEG, PNG, WEBP")) {
     err = new BadRequestError(err.message);
+  } else if (err instanceof mongoose.Error.ValidationError) {
+    const message = Object.values(err.errors)
+      .map((e) => e.message)
+      .join(", ");
+    err = new BadRequestError(message);
+  } else if (err instanceof mongoose.Error.CastError) {
+    err = new BadRequestError(`Invalid ${err.path}: ${err.value}`);
+  } else if (
+    err instanceof Error &&
+    "code" in err &&
+    (err as { code?: number }).code === 11000
+  ) {
+    const field = Object.keys((err as { keyValue?: Record<string, unknown> }).keyValue ?? {})[0];
+    err = new ConflictError(field ? `${field} already in use` : "Duplicate value");
   }
 
   if (err instanceof ApiError) {
