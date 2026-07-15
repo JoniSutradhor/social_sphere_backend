@@ -6,6 +6,7 @@ export interface IComment {
   parentId: mongoose.Types.ObjectId | null;
   rootId: mongoose.Types.ObjectId | null;
   content: string;
+  imageUrl: string | null;
   likeCount: number;
   dislikeCount: number;
   replyCount: number;
@@ -45,6 +46,10 @@ const commentSchema = new Schema<IComment, CommentModel>(
       required: [true, "Content is required"],
       trim: true,
       maxlength: [2000, "Comment cannot exceed 2000 characters"],
+    },
+    imageUrl: {
+      type: String,
+      default: null,
     },
     likeCount: {
       type: Number,

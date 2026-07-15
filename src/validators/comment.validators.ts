@@ -25,6 +25,8 @@ export const createCommentSchema = z.object({
 export const updateCommentSchema = z.object({
   body: z.object({
     content: contentSchema,
+    // multipart fields arrive as strings, hence the coercion
+    removeImage: z.coerce.boolean().optional(),
   }),
   params: z.object({ id: objectIdSchema }),
 });

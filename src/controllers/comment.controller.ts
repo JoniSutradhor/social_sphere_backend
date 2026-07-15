@@ -22,11 +22,13 @@ export const getReplies = asyncHandler(async (req, res) => {
 
 export const createComment = asyncHandler(async (req, res) => {
   const { content, pageId, parentId } = req.body as CreateCommentInput;
+  const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
   const comment = await commentService.createComment({
     userId: req.user!.id,
     content,
     pageId,
     parentId,
+    imageUrl,
   });
   res.status(201).json(comment);
 });
@@ -44,8 +46,9 @@ export const addReply = asyncHandler(async (req, res) => {
 
 export const updateComment = asyncHandler(async (req, res) => {
   const { id } = req.params as { id: string };
-  const { content } = req.body as { content: string };
-  const comment = await commentService.updateComment(id, req.user!.id, content);
+  const { content, removeImage } = req.body as { content: string; removeImage?: boolean };
+  const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+  const comment = await commentService.updateComment(id, req.user!.id, content, { imageUrl, removeImage });
   res.json(comment);
 });
 

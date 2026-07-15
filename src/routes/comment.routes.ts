@@ -12,6 +12,7 @@ import {
 import { protect } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import { commentMutationRateLimiter } from "../middleware/rateLimit.middleware.js";
+import { uploadImage } from "../middleware/upload.middleware.js";
 import {
   createCommentSchema,
   updateCommentSchema,
@@ -26,8 +27,22 @@ const router = Router();
 router.get("/", validate(listCommentsQuerySchema), getComments);
 router.get("/:id/replies", validate(listRepliesQuerySchema), getReplies);
 
-router.post("/", protect, commentMutationRateLimiter, validate(createCommentSchema), createComment);
-router.put("/:id", protect, commentMutationRateLimiter, validate(updateCommentSchema), updateComment);
+router.post(
+  "/",
+  protect,
+  commentMutationRateLimiter,
+  uploadImage,
+  validate(createCommentSchema),
+  createComment
+);
+router.put(
+  "/:id",
+  protect,
+  commentMutationRateLimiter,
+  uploadImage,
+  validate(updateCommentSchema),
+  updateComment
+);
 router.delete(
   "/:id",
   protect,

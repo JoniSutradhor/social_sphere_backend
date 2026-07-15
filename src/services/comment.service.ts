@@ -11,6 +11,7 @@ import {
   type DateIdCursor,
 } from "../utils/pagination.js";
 import { emitToPage } from "../sockets/emitter.js";
+import { deleteUploadedFile } from "../middleware/upload.middleware.js";
 
 const USER_PROJECTION = "firstName lastName avatar";
 
@@ -95,6 +96,7 @@ export const createComment = async (input: {
   content: string;
   pageId?: string;
   parentId?: string;
+  imageUrl?: string;
 }) => {
   let rootId: mongoose.Types.ObjectId | null = null;
   let pageId = input.pageId;
@@ -123,6 +125,7 @@ export const createComment = async (input: {
     parentId: input.parentId ?? null,
     rootId,
     content: input.content,
+    imageUrl: input.imageUrl ?? null,
   });
 
   if (input.parentId) {
@@ -135,7 +138,12 @@ export const createComment = async (input: {
   return populated;
 };
 
-export const updateComment = async (commentId: string, userId: string, content: string) => {
+export const updateComment = async (
+  commentId: string,
+  userId: string,
+  content: string,
+  options: { imageUrl?: string; removeImage?: boolean } = {}
+) => {
   const comment = await Comment.findById(commentId);
 
   if (!comment || comment.isDeleted) {
@@ -146,9 +154,23 @@ export const updateComment = async (commentId: string, userId: string, content: 
     throw new ForbiddenError("Not authorized to update this comment");
   }
 
+  const oldImageUrl = comment.imageUrl;
+
   comment.content = content;
   comment.isEdited = true;
+
+  if (options.imageUrl) {
+    comment.imageUrl = options.imageUrl;
+  } else if (options.removeImage) {
+    comment.imageUrl = null;
+  }
+
   await comment.save();
+
+  // Replaced or explicitly cleared — the old file is now orphaned, clean it up.
+  if (oldImageUrl && oldImageUrl !== comment.imageUrl) {
+    deleteUploadedFile(oldImageUrl);
+  }
 
   const populated = await comment.populate("user", USER_PROJECTION);
   emitToPage(comment.pageId, "comment-updated", populated);
@@ -167,9 +189,12 @@ export const deleteComment = async (commentId: string, userId: string) => {
     throw new ForbiddenError("Not authorized to delete this comment");
   }
 
+  const { imageUrl } = comment;
+
   if (comment.replyCount > 0) {
     comment.isDeleted = true;
     comment.content = "[deleted]";
+    comment.imageUrl = null;
     await comment.save();
   } else {
     await comment.deleteOne();
@@ -180,6 +205,10 @@ export const deleteComment = async (commentId: string, userId: string) => {
     if (comment.parentId) {
       await Comment.findByIdAndUpdate(comment.parentId, { $inc: { replyCount: -1 } });
     }
+  }
+
+  if (imageUrl) {
+    deleteUploadedFile(imageUrl);
   }
 
   emitToPage(comment.pageId, "comment-deleted", { id: comment.id, parentId: comment.parentId });
